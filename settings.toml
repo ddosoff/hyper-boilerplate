@@ -1,0 +1,12 @@
+[https]
+host_port = "127.0.0.1:4443"
+cert_pem = "localhost.crt"
+key_rsa_pem = "localhost.rsa"
+
+[http]
+host_port = "127.0.0.1:8080"
+
+[tarantool]
+host_port = "127.0.0.1:3310"
+username = "chatbro"
+password = "Tarantalka5"
