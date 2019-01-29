@@ -118,22 +118,9 @@ fn hello_from_ferris() -> Result<(), std::io::Error> {
     writer.flush()
 }
 
-fn main() {
-    hello_from_ferris().unwrap();
-
-    // Show logging info by default
-    if ::std::env::var("RUST_LOG").is_err() {
-        ::std::env::set_var("RUST_LOG", "info");
-    }
-
-    pretty_env_logger::init();
-
-    let mut settings = settings::Settings::read();
-
-    let single_threaded_settings = settings.clone();
-
-    // Start single thread event looped servers
-    let single = thread::Builder::new()
+fn spawn_single_threaded_in_separate_thread(settings: settings::Settings) {
+    // Start single threaded event loop
+    thread::Builder::new()
         .name("single_threaded".to_string())
         .spawn(move || {
             let mut rt = tokio::runtime::current_thread::Runtime::new()
@@ -144,7 +131,7 @@ fn main() {
             let exec = tokio::runtime::current_thread::TaskExecutor::current();
 
             info!("** Spawning single threaded servers **");
-            spawn_servers!(single_threaded_settings, rt, exec);
+            spawn_servers!(settings, rt, exec);
             info!("");
 
             // Wait all spawned futures ready..
@@ -153,16 +140,13 @@ fn main() {
             eprintln!("Single threaded done!");
         })
         .expect("Can't spawn single threaded");
+}
 
-    // Sleep a bit, until child thread print logs
-    thread::sleep(time::Duration::from_millis(10));
-
-    // Multithread event looped servers..
+fn spawn_multi_threaded_and_wait(settings: settings::Settings) {
+    // Start multi threaded event loops
     let mut rt = tokio::runtime::Runtime::new().expect("Can't create multi threaded runtime");
 
     let exec = rt.executor();
-
-    settings.increment_ports();
 
     info!("** Spawning multithreaded servers **");
     spawn_servers!(settings, rt, exec);
@@ -171,6 +155,27 @@ fn main() {
     rt.shutdown_on_idle()
         .wait()
         .expect("Multithreaded runtime run error");
+}
 
-    single.join().expect("My child is dead?");
+fn main() {
+    hello_from_ferris().unwrap();
+
+    // Show logging info by default
+    if ::std::env::var("RUST_LOG").is_err() {
+        ::std::env::set_var("RUST_LOG", "info");
+    }
+
+    pretty_env_logger::init();
+
+    // Mutable, because will increment ports for multithreaded runtime
+    let mut settings = settings::Settings::read();
+
+    spawn_single_threaded_in_separate_thread(settings.clone());
+
+    // Sleep until first child thread print logs
+    thread::sleep(time::Duration::from_millis(10));
+
+    settings.increment_ports();
+
+    spawn_multi_threaded_and_wait(settings);
 }
