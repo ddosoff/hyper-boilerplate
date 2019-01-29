@@ -12,5 +12,7 @@ $ curl -s https://static.rust-lang.org/rustup.sh | sh -s -- --channel=nightly
 Clone and run
 
 $ git clone https://github.com/ddosoff/hyper-boilerplate.git
+
 $ cd cd hyper-boilerplate
+
 $ cargo run --release
