@@ -21,7 +21,7 @@ use hyper::{
     Server,
 };
 use log::{info, warn};
-use std::io::Write;
+use std::{io::Write, thread, time};
 
 async fn serve_req(_req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     // Always return successfully with a response containing a body with
@@ -128,19 +128,24 @@ fn main() {
 
     pretty_env_logger::init();
 
-    let settings = settings::Settings::read();
+    let mut settings = settings::Settings::read();
+
+    let single_threaded_settings = settings.clone();
 
     // Start single thread event looped servers
-    let single = std::thread::Builder::new()
+    let single = thread::Builder::new()
         .name("single_threaded".to_string())
         .spawn(move || {
-            let mut rt = tokio::runtime::current_thread::Runtime::new().expect("rt");
+            let mut rt = tokio::runtime::current_thread::Runtime::new()
+                .expect("Can't create single thread runtime");
 
-            // Impossible to get executor from runtime..?
+            // Impossible to get like rt.executor() !?
+            // let exec = rt.executor();
             let exec = tokio::runtime::current_thread::TaskExecutor::current();
 
-            // Spawn servers from setttings
-            spawn_servers!(settings, rt, exec);
+            info!("** Spawning single threaded servers **");
+            spawn_servers!(single_threaded_settings, rt, exec);
+            info!("");
 
             // Wait all spawned futures ready..
             rt.run().expect("Single threaded runtime error");
@@ -148,6 +153,24 @@ fn main() {
             eprintln!("Single threaded done!");
         })
         .expect("Can't spawn single threaded");
+
+    // Sleep a bit, until child thread print logs
+    thread::sleep(time::Duration::from_millis(10));
+
+    // Multithread event looped servers..
+    let mut rt = tokio::runtime::Runtime::new().expect("Can't create multi threaded runtime");
+
+    let exec = rt.executor();
+
+    settings.increment_ports();
+
+    info!("** Spawning multithreaded servers **");
+    spawn_servers!(settings, rt, exec);
+    info!("");
+
+    rt.shutdown_on_idle()
+        .wait()
+        .expect("Multithreaded runtime run error");
 
     single.join().expect("My child is dead?");
 }

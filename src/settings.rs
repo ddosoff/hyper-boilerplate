@@ -34,4 +34,16 @@ impl Settings {
 
         return settings;
     }
+
+    pub fn increment_ports(&mut self) {
+        if let Some(ref mut https) = self.https {
+            let next_port = https.host_port.port() + 1;
+            https.host_port.set_port(next_port);
+        }
+
+        if let Some(ref mut http) = self.http {
+            let next_port = http.host_port.port() + 1;
+            http.host_port.set_port(next_port);
+        }
+    }
 }
